@@ -23,8 +23,29 @@ export abstract class RustSyntaxNodeDecor implements RustSyntaxNodeDecor {
       case "LetDeclaration": {
         return new LetDeclarationNode(node);
       }
+      case "IfExpression": {
+        return new IfExpressionNode(node);
+      }
+      case "Identifier": {
+        return new IdentifierNode(node);
+      }
+      case "String":
+      case "RawString":
+      case "Char":
+      case "boolean":
+      case "Integer":
+      case "Float": {
+        return new LiteralExpressionNode(node);
+      }
+      // Fallback
       default: {
-        return new DefaultItemNode(node);
+        if (node.type.is("Statement")) {
+          return new DefaultStatementNode(node);
+        } else if (node.type.is("Expression")) {
+          return new DefaultExpressionNode(node);
+        } else {
+          return new DefaultNode(node);
+        }
       }
     }
   }
@@ -72,11 +93,27 @@ export abstract class RustSyntaxNodeDecor implements RustSyntaxNodeDecor {
   get type() {
     return this.node.type;
   }
+
+  get cursor() {
+    return this.node.cursor();
+  }
 }
 
-export class DefaultItemNode extends RustSyntaxNodeDecor {
+export class DefaultStatementNode extends RustSyntaxNodeDecor {
   accept(v: RustSyntaxNodeVisitor) {
-    v.visitDefaultItemNode(this);
+    v.visitDefaultStatementNode(this);
+  }
+}
+
+export class DefaultExpressionNode extends RustSyntaxNodeDecor {
+  accept(v: RustSyntaxNodeVisitor) {
+    v.visitDefaultExpressionNode(this);
+  }
+}
+
+export class DefaultNode extends RustSyntaxNodeDecor {
+  accept(v: RustSyntaxNodeVisitor) {
+    v.visitDefaultNode(this);
   }
 }
 
@@ -95,5 +132,35 @@ export class LetDeclarationNode extends RustSyntaxNodeDecor {
 export class ExpressionStatementNode extends RustSyntaxNodeDecor {
   accept(v: RustSyntaxNodeVisitor) {
     v.visitExpressionStatementNode(this);
+  }
+}
+
+export class IfExpressionNode extends RustSyntaxNodeDecor {
+  accept(v: RustSyntaxNodeVisitor) {
+    v.visitIfExpressionNode(this);
+  }
+}
+
+export class CallExpressionNode extends RustSyntaxNodeDecor {
+  accept(v: RustSyntaxNodeVisitor) {
+    v.visitCallExpression(this);
+  }
+}
+
+export class BinaryExpressionNode extends RustSyntaxNodeDecor {
+  accept(v: RustSyntaxNodeVisitor) {
+    v.visitBinaryExpression(this);
+  }
+}
+
+export class LiteralExpressionNode extends RustSyntaxNodeDecor {
+  accept(v: RustSyntaxNodeVisitor) {
+    v.visitLiteralExpressionNode(this);
+  }
+}
+
+export class IdentifierNode extends RustSyntaxNodeDecor {
+  accept(v: RustSyntaxNodeVisitor) {
+    v.visitIdentifierNode(this);
   }
 }

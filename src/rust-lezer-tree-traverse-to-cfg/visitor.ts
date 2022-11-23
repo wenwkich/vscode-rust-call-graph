@@ -1,16 +1,31 @@
+import { GraphManager } from "./graph";
 import {
-  DefaultItemNode,
+  BinaryExpressionNode,
+  CallExpressionNode,
+  DefaultExpressionNode,
+  DefaultNode,
+  DefaultStatementNode,
   ExpressionStatementNode,
   FunctionItemNode,
+  IdentifierNode,
+  IfExpressionNode,
   LetDeclarationNode,
+  LiteralExpressionNode,
   RustSyntaxNodeDecor,
 } from "./node";
+import { InternalStateManager } from "./state";
 
 export class RustSyntaxNodeVisitor {
+  // source code
   source: string | Buffer;
-  stacks: Record<string, string[]> = {};
-  // mapping of a function scope to variable set
-  existingVar: Record<string, Record<string, RustSyntaxNodeDecor>> = {};
+
+  /** internal state */
+  stateManager = new InternalStateManager<RustSyntaxNodeDecor>();
+
+  /** graph state */
+  graphManager = new GraphManager();
+
+  // whether print internal var or not
   debug: boolean;
 
   // TODO: set default debug to false;
@@ -19,36 +34,195 @@ export class RustSyntaxNodeVisitor {
     this.debug = debug;
   }
 
-  get result(): Record<string, string> {
-    return {
-      default: "",
-    };
+  /** DEFAULT NODES FALLBACK */
+  visitDefaultStatementNode(node: DefaultStatementNode) {
+    this.visitExpressionChildren(node);
   }
 
-  visitChildren(node: RustSyntaxNodeDecor) {
-    const nodes = node.getChildren("Statement");
-    nodes.map((node) => node.accept(this));
+  visitDefaultExpressionNode(node: DefaultExpressionNode) {
+    this.log("===== defaultExpressionNode");
+    this.log(node.name);
+    this.log(this.sliceSource(node));
+    this.visitExpressionChildren(node);
+    this.log("===== end defaultExpressionNode");
   }
 
-  private visitParentUntilFindFunctionItem(
-    node: RustSyntaxNodeDecor
-  ): FunctionItemNode | null {
-    const parent = node.parent;
+  // do nothing
+  visitDefaultNode(node: DefaultNode) {
+    this.log("===== defaultNode");
+    console.log(node.name);
+    console.log(this.sliceSource(node));
+    this.log("===== end defaultNode");
+  }
 
-    if (parent === null) {
-      return null;
+  /** STATEMENTS */
+  visitExpressionStatementNode(node: ExpressionStatementNode) {
+    this.visitExpressionChildren(node);
+  }
+
+  visitFunctionItemNode(node: FunctionItemNode) {
+    const funcName = this.getNameFromNode(node);
+
+    // initialize block and existingVar
+    const realFuncName = this.stateManager.initializeFunction(funcName, node);
+    this.graphManager.initializeFunction(realFuncName);
+
+    const blockNode = node.getChild("Block");
+    if (blockNode === null) {
+      return;
+    }
+    this.visitStatementChildren(blockNode);
+
+    this.stateManager.popFunction();
+  }
+
+  visitLetDeclarationNode(node: LetDeclarationNode) {
+    // todo
+    let varName = this.getNameFromNode(node);
+
+    // last item in the function stack is the current scope
+    const counter = this.stateManager.incrementCounter(varName);
+
+    if (counter !== 0) {
+      varName += `_${counter}`;
     }
 
-    if (parent.name !== "FunctionItem") {
-      return this.visitParentUntilFindFunctionItem(parent);
-    } else {
-      return parent as FunctionItemNode;
-    }
+    // push it to the stack
+    this.stateManager.pushToCurrentStack(varName, node);
+
+    this.visitExpressionChildren(node);
+
+    this.popAllAndDrawGraph();
   }
 
-  private getNameFromFunctionItemNode(
-    node: FunctionItemNode | LetDeclarationNode
+  // if a == 0 {
+  //   statement_1;
+  // } else if a = 1 {
+  //   statement_2;
+  // }
+
+  // ["if a == 0", statement_1, ]
+  // [a, "if a = 0"]
+
+  // "if a == 0"-true-> statement 1
+  // a->"if a = 0"
+  // "if a = 0"-false->"if a = 1"
+
+  /** EXPRESSIONS */
+  visitIfExpressionNode(node: IfExpressionNode) {
+    // todo
+    const condition = node.getChild("Expression | LetDeclaration");
+    // traverse the condition first
+    condition?.accept(this);
+    const blocks = node.getChildren("Block");
+    blocks.map((block) => {
+      this.visitStatementChildren(block);
+    });
+  }
+
+  visitCallExpression(node: CallExpressionNode) {
+    // todo
+  }
+
+  // a + b - c
+
+  // [add, a, add, c, minus, add, minus c]
+
+  visitBinaryExpression(node: BinaryExpressionNode) {
+    // TODO:
+    this.log("====== binary");
+    this.visitExpressionChildren(node);
+    this.log("====== end binary");
+    // this.
+    // this.mapExpressionChildren(node, (node) => {
+    //   switch (node.name) {
+    //     case "ArithOp":
+    //     case "BitOp":
+    //     case "CompareOp":
+    //     case "LogicOp": {
+
+    //       break;
+    //     }
+    //   }
+    // });
+  }
+
+  visitIdentifierNode(node: IdentifierNode) {
+    // TODO:
+    this.log("==== identifier");
+    this.log(this.sliceSource(node));
+    this.stateManager.pushToCurrentStack(this.sliceSource(node), node);
+    this.log("==== end identifier");
+  }
+
+  visitLiteralExpressionNode(node: LiteralExpressionNode) {
+    this.log("==== literal");
+
+    this.log(this.sliceSource(node));
+    this.stateManager.pushToCurrentStack(this.sliceSource(node), node);
+    this.log("==== end literal");
+    // no more children to visit
+  }
+
+  get result() {
+    return this.graphManager.result;
+  }
+
+  /** PRIVATE FUNCTIONS */
+  private visitChildren(
+    type: "Statement" | "Expression",
+    node: RustSyntaxNodeDecor,
+    before?: (node: RustSyntaxNodeDecor) => void,
+    after?: (node: RustSyntaxNodeDecor) => void
   ) {
+    const nodes = node.getChildren(type);
+    nodes.map((node) => {
+      before && before(node);
+      node.accept(this);
+      after && after(node);
+    });
+  }
+
+  private visitStatementChildren(
+    node: RustSyntaxNodeDecor,
+    before?: (node: RustSyntaxNodeDecor) => void,
+    after?: (node: RustSyntaxNodeDecor) => void
+  ) {
+    this.visitChildren("Statement", node, before, after);
+  }
+
+  private visitExpressionChildren(
+    node: RustSyntaxNodeDecor,
+    before?: (node: RustSyntaxNodeDecor) => void,
+    after?: (node: RustSyntaxNodeDecor) => void
+  ) {
+    this.visitChildren("Expression", node, before, after);
+  }
+
+  private mapChildren(
+    type: "Statement" | "Expression",
+    node: RustSyntaxNodeDecor,
+    mapFunc: (node: RustSyntaxNodeDecor) => void
+  ) {
+    const nodes = node.getChildren(type);
+    nodes.map(mapFunc);
+  }
+
+  private mapStatementChildren(
+    node: RustSyntaxNodeDecor,
+    mapFunc: (node: RustSyntaxNodeDecor) => void
+  ) {
+    this.mapChildren("Statement", node, mapFunc);
+  }
+
+  private mapExpressionChildren(
+    node: RustSyntaxNodeDecor,
+    mapFunc: (node: RustSyntaxNodeDecor) => void
+  ) {
+    this.mapChildren("Expression", node, mapFunc);
+  }
+
+  private getNameFromNode(node: FunctionItemNode | LetDeclarationNode) {
     const boundElem = node.getChild("BoundIdentifier");
     return this.source.slice(boundElem?.from, boundElem?.to).toString();
   }
@@ -59,43 +233,85 @@ export class RustSyntaxNodeVisitor {
     }
   }
 
-  visitDefaultItemNode(node: DefaultItemNode) {
-    this.visitChildren(node);
+  private sliceSourceReplaced(node: RustSyntaxNodeDecor) {
+    return this.sliceSource(node).replace(
+      /<<|>>|&&|\|\||>=|<=|==|[\-_]|\s/g,
+      (m) =>
+        ({
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          "+": "_add_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          "-": "_sub_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          "*": "_mul_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          "/": "_div_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          "%": "_mod_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          "<<": "_left_shift_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          ">>": "_right_shift_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          "&&": "_and_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          "||": "_or_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          "|": "_bit_or_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          "&": "_bit_or_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          "^": "_bit_xor_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          ">=": "_geq_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          "<=": "_leq_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          "==": "_eq_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          "<": "_lt_",
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          ">": "_gt_",
+        }[m] || "_")
+    );
   }
 
-  visitExpressionStatementNode(node: ExpressionStatementNode) {
-    this.visitChildren(node);
+  private sliceSource(node: RustSyntaxNodeDecor) {
+    return this.source.slice(node.from, node.to).toString();
   }
 
-  visitFunctionItemNode(node: FunctionItemNode) {
-    // initialize the stack
-    const functionName = this.getNameFromFunctionItemNode(node);
-    this.stacks[functionName] = [];
-    this.existingVar[functionName] = {};
-    const blockNode = node.getChild("Block");
+  /** draw graph from stack */
+  private popAllAndDrawGraph() {
+    const stackLen = this.stateManager.getCurrentStackLength();
+    // if (stackLen % 2 !== 0) {
+    //   throw new Error("Stack Length is not even");
+    // }
 
-    this.log(functionName);
-
-    if (blockNode === null) {
-      return;
+    while (!this.stateManager.isCurrentStackEmpty()) {
+      const left = this.stateManager.popFromCurrentStack();
+      const right = this.stateManager.popFromCurrentStack();
+      left && right && this.graphManager.pushEdge(left.name, right.name);
     }
-
-    this.visitChildren(blockNode);
+    // this is to make sure the order is reversed
+    this.graphManager.popAndAddEdges(
+      this.stateManager.peekCurrentFunctionName()
+    );
   }
 
-  visitLetDeclarationNode(node: LetDeclarationNode) {
-    // todo
-    const varName = this.getNameFromFunctionItemNode(node);
+  private popAndDrawGraph() {
+    const stackLen = this.stateManager.getCurrentStackLength();
+    // if (stackLen % 2 !== 0) {
+    //   throw new Error("Stack Length is not even");
+    // }
 
-    const functionNode = this.visitParentUntilFindFunctionItem(node);
-    if (functionNode !== null) {
-      // push the variable to the function scope
-      const functionName = this.getNameFromFunctionItemNode(functionNode);
-      this.existingVar[functionName][varName] = node;
-    }
-
-    this.log(varName);
-
-    this.visitChildren(node);
+    const left = this.stateManager.popFromCurrentStack();
+    const right = this.stateManager.popFromCurrentStack();
+    left &&
+      right &&
+      this.graphManager.addEdge(
+        this.stateManager.peekCurrentFunctionName(),
+        left.name,
+        right.name
+      );
   }
 }
