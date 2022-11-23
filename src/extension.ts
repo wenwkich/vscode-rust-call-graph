@@ -2,6 +2,10 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import { getWebviewContent } from "./view";
+import { parser as rustParser } from "@lezer/rust";
+import { parser as pyParser } from "@lezer/python";
+import { parser as jsParser } from "@lezer/javascript";
+import { RustCallGraphTraversalClient } from "./rust-lezer-tree-traverse-to-cfg";
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -12,6 +16,38 @@ export function activate(context: vscode.ExtensionContext) {
   let disposable = vscode.commands.registerCommand(
     "vscode-call-graph.showCallGraph",
     () => {
+      const document = vscode.window.activeTextEditor?.document;
+      const languageId = document?.languageId;
+      const source = document?.getText();
+
+      if (source === undefined) {
+        vscode.window.showInformationMessage("No Source Files");
+        return;
+      }
+
+      let dots: Record<string, string>;
+      switch (languageId) {
+        case "rust": {
+          const tree = rustParser.parse(source);
+          dots = new RustCallGraphTraversalClient(tree, source).traverse();
+          break;
+        }
+        // case "python": {
+        //   tree = pyParser.parse(source);
+        //   break;
+        // }
+        // case "javascript": {
+        //   tree = jsParser.parse(source);
+        //   break;
+        // }
+        default: {
+          vscode.window.showInformationMessage(
+            "Language not supported, supported language: rust, python and javascript"
+          );
+          return;
+        }
+      }
+
       // The code you place here will be executed every time your command is executed
       // Display a message box to the user
       const panel = vscode.window.createWebviewPanel(
@@ -23,30 +59,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
       );
 
-      panel.webview.html = getWebviewContent("main", {
-        main: `digraph {
-          node [ style="filled" ]
-          a [ id="main" color="#FCECCB" ];
-          b [ id="second" class="clicky" shape="plaintext" style="filled,rounded" color="#D5EDFF" ];
-          c [ id="third" class="clicky" shape="plaintext" style="filled,rounded" color="#FCECCB" ];
-          a -> b -> c;
-        }`,
-        second: `digraph {
-          node [ style="filled" ]
-          a [ id="main" color="#FCECCB" ];
-          b [ id="second" class="clicky" shape="plaintext" style="filled,rounded" color="#D5EDFF" ];
-          c [ id="third" class="clicky" shape="plaintext" style="filled,rounded" color="#FCECCB" ];
-          b -> a -> c;
-        }`,
-        third: `digraph {
-          node [ style="filled" ]
-          a [ id="main" color="#FCECCB" ];
-          b [ id="second" class="clicky" shape="plaintext" style="filled,rounded" color="#D5EDFF" ];
-          c [ id="third" class="clicky" shape="plaintext" style="filled,rounded" color="#FCECCB" ];
-          c -> b -> a;
-        }`,
-      });
-      console.log(panel.webview.html);
+      panel.webview.html = getWebviewContent("default", dots);
     }
   );
 
