@@ -159,7 +159,12 @@ export class RustSyntaxNodeVisitor {
     const funcIden = node.getChild("Identifier");
     const argList = node.getChild("ArgList");
 
-    // TODO: check repeat
+    // need to check number
+    const contextFuncName = this.stateManager.peekCurrentFunctionName();
+    const name = this.sliceSource(funcIden!);
+    const counter = this.stateManager.incrementCounter(name);
+    const funcId = counter === 0 ? name : `${name}_${counter}`;
+    this.graphManager.addFuncNode(contextFuncName, funcId, name);
 
     if (!node.type.is("Statement")) {
       this.stateManager.pushToCurrentStack(this.sliceSource(funcIden!));
@@ -214,15 +219,9 @@ export class RustSyntaxNodeVisitor {
     // see if this is variable or a function
     const name = this.sliceSource(node);
     const contextFuncName = this.stateManager.peekCurrentFunctionName();
-    if (node.parent?.name === "CallExpression") {
-      // need to check number
-      const counter = this.stateManager.incrementCounter(name);
-      const realName = counter === 0 ? name : `${name}_${counter}`;
-      this.graphManager.addFuncNode(contextFuncName, realName, realName);
-    } else {
-      if (this.stateManager.getCounter(name) === 0) {
-        this.graphManager.addVarNode(contextFuncName, name, name);
-      }
+
+    if (this.stateManager.getCounter(name) === 0) {
+      this.graphManager.addVarNode(contextFuncName, name, name);
     }
     this.stateManager.pushToCurrentStack(this.sliceSource(node));
   }
