@@ -48,28 +48,12 @@
   dependencies:
     "@lezer/common" "^1.0.0"
 
-"@lezer/javascript@^1.1.1":
-  version "1.1.1"
-  resolved "https://registry.yarnpkg.com/@lezer/javascript/-/javascript-1.1.1.tgz#ac3560a9d3a2cebe81f078423e8da83e3958daa4"
-  integrity sha512-bPsN0nria42StUTU6AZmYFDm/jDXAwMWT1x2EuiNfwVEZlJGJezie1r1wJIvEtw6zoRph3fo0adLxiis1mgh/Q==
-  dependencies:
-    "@lezer/highlight" "^1.0.0"
-    "@lezer/lr" "^1.0.0"
-
 "@lezer/lr@^1.0.0":
   version "1.2.5"
   resolved "https://registry.yarnpkg.com/@lezer/lr/-/lr-1.2.5.tgz#e9088164a711690596f17378665e0554157c9b03"
   integrity sha512-f9319YG1A/3ysgUE3bqCHEd7g+3ZZ71MWlwEc42mpnLVYXgfJJgtu1XAyBB4Kz8FmqmnFe9caopDqKeMMMAU6g==
   dependencies:
     "@lezer/common" "^1.0.0"
-
-"@lezer/python@^1.1.1":
-  version "1.1.1"
-  resolved "https://registry.yarnpkg.com/@lezer/python/-/python-1.1.1.tgz#6d688071ed93d063a589a7d31df3279b1eba607a"
-  integrity sha512-ArUGh9kvdaOVu6IkSaYUS9WFQeMAFVWKRuZo6vexnxoeCLnxf0Y9DCFEAMMa7W9SQBGYE55OarSpPqSkdOXSCA==
-  dependencies:
-    "@lezer/highlight" "^1.0.0"
-    "@lezer/lr" "^1.0.0"
 
 "@lezer/rust@^1.0.0":
   version "1.0.0"

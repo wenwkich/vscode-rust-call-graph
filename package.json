@@ -1,6 +1,6 @@
 {
-  "name": "vscode-call-graph",
-  "displayName": "vscode-call-graph",
+  "name": "vscode-rust-call-graph",
+  "displayName": "vscode-rust-call-graph",
   "description": "",
   "version": "0.0.1",
   "engines": {
@@ -10,14 +10,14 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:vscode-call-graph.showCallGraph"
+    "onCommand:vscode-rust-call-graph.showCallGraph"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "vscode-call-graph.showCallGraph",
-        "title": "Show Call Graph of Current File"
+        "command": "vscode-rust-call-graph.showCallGraph",
+        "title": "Rust: Show Call Graph of Current File"
       }
     ]
   },
@@ -43,8 +43,6 @@
     "typescript": "^4.8.4"
   },
   "dependencies": {
-    "@lezer/javascript": "^1.1.1",
-    "@lezer/python": "^1.1.1",
     "@lezer/rust": "^1.0.0"
   }
 }

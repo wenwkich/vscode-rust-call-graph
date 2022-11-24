@@ -3,7 +3,7 @@
 import * as vscode from "vscode";
 import { getWebviewContent } from "./view";
 import { parser as rustParser } from "@lezer/rust";
-import { RustCallGraphTraversalClient } from "./rust-lezer-tree-traverse-to-cfg";
+import { RustCallGraphTraversalClient } from "./rust-lezer-tree-call-graph";
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -30,14 +30,6 @@ export function activate(context: vscode.ExtensionContext) {
           dots = new RustCallGraphTraversalClient(tree, source).traverse();
           break;
         }
-        // case "python": {
-        //   tree = pyParser.parse(source);
-        //   break;
-        // }
-        // case "javascript": {
-        //   tree = jsParser.parse(source);
-        //   break;
-        // }
         default: {
           vscode.window.showInformationMessage(
             "Language not supported, supported language: rust, python and javascript"
