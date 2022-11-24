@@ -48,6 +48,7 @@ export function activate(context: vscode.ExtensionContext) {
       );
 
       // TODO: let user input the entry function
+      // TODO: user can highlight the function name and open context menu to activate it
       panel.webview.html = getWebviewContent("run_demo", dots);
     }
   );

@@ -206,6 +206,8 @@ export class RustSyntaxNodeVisitor {
     });
   }
 
+  // TODO: handle access function
+
   // TODO: handle return
 
   visitIdentifierNode(node: IdentifierNode) {

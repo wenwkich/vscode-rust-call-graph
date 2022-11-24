@@ -8,6 +8,7 @@ export class GraphManager {
   stack: string[] = [];
 
   getFuncResult(funcName: string) {
+    // TODO: beautify the dots
     return `
 ${digraphStart}
 

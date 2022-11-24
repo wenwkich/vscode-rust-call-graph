@@ -24,6 +24,7 @@ export class RustCallGraphTraversalClient {
     let node = this.tree.topNode;
 
     // start with function items only
+    // TODO: struct impl functions?
     const funcElems = node.getChildren("FunctionItem");
     const funcNodes = funcElems.map((funcEl) =>
       RustSyntaxNodeDecor.fromSyntaxNode(funcEl)
