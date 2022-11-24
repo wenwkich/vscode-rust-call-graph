@@ -29,6 +29,9 @@ export abstract class RustSyntaxNodeDecor implements RustSyntaxNodeDecor {
       case "Identifier": {
         return new IdentifierNode(node);
       }
+      case "BinaryExpression": {
+        return new BinaryExpressionNode(node);
+      }
       case "String":
       case "RawString":
       case "Char":
@@ -143,7 +146,13 @@ export class IfExpressionNode extends RustSyntaxNodeDecor {
 
 export class CallExpressionNode extends RustSyntaxNodeDecor {
   accept(v: RustSyntaxNodeVisitor) {
-    v.visitCallExpression(this);
+    v.visitCallExpressionNode(this);
+  }
+}
+
+export class AssignmentExpressionNode extends RustSyntaxNodeDecor {
+  accept(v: RustSyntaxNodeVisitor) {
+    v.visitAssignmentExpressionNode(this);
   }
 }
 

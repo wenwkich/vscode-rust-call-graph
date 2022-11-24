@@ -1,5 +1,6 @@
 import { GraphManager } from "./graph";
 import {
+  AssignmentExpressionNode,
   BinaryExpressionNode,
   CallExpressionNode,
   DefaultExpressionNode,
@@ -40,20 +41,11 @@ export class RustSyntaxNodeVisitor {
   }
 
   visitDefaultExpressionNode(node: DefaultExpressionNode) {
-    this.log("===== defaultExpressionNode");
-    this.log(node.name);
-    this.log(this.sliceSource(node));
     this.visitExpressionChildren(node);
-    this.log("===== end defaultExpressionNode");
   }
 
   // do nothing
-  visitDefaultNode(node: DefaultNode) {
-    this.log("===== defaultNode");
-    console.log(node.name);
-    console.log(this.sliceSource(node));
-    this.log("===== end defaultNode");
-  }
+  visitDefaultNode(node: DefaultNode) {}
 
   /** STATEMENTS */
   visitExpressionStatementNode(node: ExpressionStatementNode) {
@@ -78,89 +70,145 @@ export class RustSyntaxNodeVisitor {
 
   visitLetDeclarationNode(node: LetDeclarationNode) {
     // todo
-    let varName = this.getNameFromNode(node);
-
-    // last item in the function stack is the current scope
-    const counter = this.stateManager.incrementCounter(varName);
-
-    if (counter !== 0) {
-      varName += `_${counter}`;
-    }
-
-    // push it to the stack
-    this.stateManager.pushToCurrentStack(varName, node);
+    let varNames = this.getBoundIdentifiersFromNode(node);
 
     this.visitExpressionChildren(node);
 
     this.popAllAndDrawGraph();
-  }
+    const lastItem = this.stateManager.popFromCurrentStack();
+    const funcName = this.stateManager.peekCurrentFunctionName();
 
-  // if a == 0 {
-  //   statement_1;
-  // } else if a = 1 {
-  //   statement_2;
-  // }
+    varNames.map((varName) => {
+      const counter = this.stateManager.incrementCounter(varName);
 
-  // ["if a == 0", statement_1, ]
-  // [a, "if a = 0"]
+      if (counter !== 0) {
+        varName += `_${counter}`;
+      }
 
-  // "if a == 0"-true-> statement 1
-  // a->"if a = 0"
-  // "if a = 0"-false->"if a = 1"
+      // TODO: add node to graph
 
-  /** EXPRESSIONS */
-  visitIfExpressionNode(node: IfExpressionNode) {
-    // todo
-    const condition = node.getChild("Expression | LetDeclaration");
-    // traverse the condition first
-    condition?.accept(this);
-    const blocks = node.getChildren("Block");
-    blocks.map((block) => {
-      this.visitStatementChildren(block);
+      // connect the last item with variables
+      if (lastItem) {
+        this.graphManager.addEdge(funcName, lastItem.name, varName);
+      }
     });
   }
 
-  visitCallExpression(node: CallExpressionNode) {
-    // todo
+  /** EXPRESSIONS */
+  visitIfExpressionNode(node: IfExpressionNode) {
+    // TODO: add nodes
+    this.stateManager.pushToCurrentStack("if", node);
+
+    // traverse the condition first
+    const expression = node.getChild("Expression");
+    const letStatement = node.getChild("LetDeclaration");
+
+    const funcName = this.stateManager.peekCurrentFunctionName();
+
+    const cond = expression || letStatement;
+    const condName = cond !== null ? this.sliceSourceReplaced(cond) : "";
+    // TODO: add mode for full statement
+    cond?.accept(this);
+    const lastElems = this.stateManager.popAllFromCurrentStack();
+    // TODO: remember to add nodes
+    lastElems.map((elem) => {
+      this.graphManager.addEdge(funcName, elem!.name, condName);
+    });
+
+    const blocks = node.getChildren("Block");
+    // if block
+    if (blocks.length >= 1) {
+      const ifBlock = blocks[0];
+
+      const blockName = condName + "_then";
+      // TODO: remember to add nodes
+
+      this.graphManager.addEdge(funcName, condName, blockName, "then");
+
+      const realFuncName = this.stateManager.initializeFunction(
+        blockName,
+        node
+      );
+      this.graphManager.initializeFunction(realFuncName);
+
+      this.visitStatementChildren(ifBlock);
+
+      this.stateManager.popFunction();
+    }
+
+    // there is a else block
+    if (blocks.length === 2) {
+      const elseBlock = blocks[1];
+
+      const blockName = condName + "_else";
+      // TODO: remember to add nodes
+
+      this.graphManager.addEdge(funcName, condName, blockName, "else");
+
+      const realFuncName = this.stateManager.initializeFunction(
+        blockName,
+        node
+      );
+      this.graphManager.initializeFunction(realFuncName);
+
+      this.visitStatementChildren(elseBlock);
+
+      this.stateManager.popFunction();
+    }
+
+    this.visitExpressionChildren(node);
   }
 
-  // a + b - c
+  // TODO: MatchExpression
+  // TODO: WhileExpression
+  // TODO: LoopExpression
+  // TODO: ForExpression
 
-  // [add, a, add, c, minus, add, minus c]
+  visitCallExpressionNode(node: CallExpressionNode) {
+    const funcInden = this.getIdentifiersFromNode(node);
+    // TODO: draw function node if not declared
+    this.stateManager.pushToCurrentStack(this.sliceSource(node), node);
+    this.visitExpressionChildren(node);
+  }
+
+  // TODO: visit assignment expression
+  visitAssignmentExpressionNode(node: AssignmentExpressionNode) {
+    // TODO:
+  }
 
   visitBinaryExpression(node: BinaryExpressionNode) {
-    // TODO:
-    this.log("====== binary");
-    this.visitExpressionChildren(node);
-    this.log("====== end binary");
-    // this.
-    // this.mapExpressionChildren(node, (node) => {
-    //   switch (node.name) {
-    //     case "ArithOp":
-    //     case "BitOp":
-    //     case "CompareOp":
-    //     case "LogicOp": {
+    const arithOp = node.getChild("ArithOp");
+    const bitOp = node.getChild("BitOp");
+    const compareOp = node.getChild("CompareOp");
+    const logicOp = node.getChild("LogicOp");
 
-    //       break;
-    //     }
-    //   }
-    // });
+    const op = arithOp || bitOp || compareOp || logicOp;
+    let opName = this.sliceSourceReplaced(op!);
+
+    const opCount = this.stateManager.incrementCounter(opName);
+
+    if (opCount !== 0) {
+      opName += `_${opCount}`;
+    }
+
+    // TODO: check if the order is correct
+    if (!node.type.is("Statement")) {
+      this.stateManager.pushToCurrentStack(opName, op!);
+    }
+
+    this.mapExpressionChildren(node, (child) => {
+      this.stateManager.pushToCurrentStack(opName, op!);
+      child.accept(this);
+    });
   }
 
   visitIdentifierNode(node: IdentifierNode) {
-    // TODO:
-    this.log("==== identifier");
-    this.log(this.sliceSource(node));
+    // TODO: see if this is variable or a function
     this.stateManager.pushToCurrentStack(this.sliceSource(node), node);
-    this.log("==== end identifier");
   }
 
   visitLiteralExpressionNode(node: LiteralExpressionNode) {
-    this.log("==== literal");
-
-    this.log(this.sliceSource(node));
     this.stateManager.pushToCurrentStack(this.sliceSource(node), node);
-    this.log("==== end literal");
     // no more children to visit
   }
 
@@ -227,6 +275,20 @@ export class RustSyntaxNodeVisitor {
     return this.source.slice(boundElem?.from, boundElem?.to).toString();
   }
 
+  private getBoundIdentifiersFromNode(node: RustSyntaxNodeDecor) {
+    const boundElems = node.getChildren("BoundIdentifier");
+    return boundElems.map((boundElem) =>
+      this.source.slice(boundElem?.from, boundElem?.to).toString()
+    );
+  }
+
+  private getIdentifiersFromNode(node: RustSyntaxNodeDecor) {
+    const idenElems = node.getChildren("Identifier");
+    return idenElems.map((idenElem) =>
+      this.source.slice(idenElem?.from, idenElem?.to).toString()
+    );
+  }
+
   private log(msg: string | Buffer) {
     if (this.debug) {
       console.log(msg.toString());
@@ -282,12 +344,7 @@ export class RustSyntaxNodeVisitor {
 
   /** draw graph from stack */
   private popAllAndDrawGraph() {
-    const stackLen = this.stateManager.getCurrentStackLength();
-    // if (stackLen % 2 !== 0) {
-    //   throw new Error("Stack Length is not even");
-    // }
-
-    while (!this.stateManager.isCurrentStackEmpty()) {
+    while (this.stateManager.getCurrentStackLength() > 1) {
       const left = this.stateManager.popFromCurrentStack();
       const right = this.stateManager.popFromCurrentStack();
       left && right && this.graphManager.pushEdge(left.name, right.name);
@@ -300,9 +357,6 @@ export class RustSyntaxNodeVisitor {
 
   private popAndDrawGraph() {
     const stackLen = this.stateManager.getCurrentStackLength();
-    // if (stackLen % 2 !== 0) {
-    //   throw new Error("Stack Length is not even");
-    // }
 
     const left = this.stateManager.popFromCurrentStack();
     const right = this.stateManager.popFromCurrentStack();

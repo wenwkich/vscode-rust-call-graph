@@ -60,9 +60,23 @@ export class InternalStateManager<T> {
     return this.stacks[this.peekCurrentFunctionName()].pop();
   }
 
+  popAllFromCurrentStack() {
+    let result = [];
+
+    while (this.getCurrentStackLength() !== 0) {
+      result.push(this.stacks[this.peekCurrentFunctionName()].pop());
+    }
+
+    return result;
+  }
+
   peekStack(funcName: string) {
     const stack = this.stacks[funcName];
     return stack[stack.length - 1];
+  }
+
+  peekCurrentStack() {
+    return this.peekStack(this.peekCurrentFunctionName());
   }
 
   getCurrentStackLength() {
