@@ -3,8 +3,6 @@
 import * as vscode from "vscode";
 import { getWebviewContent } from "./view";
 import { parser as rustParser } from "@lezer/rust";
-import { parser as pyParser } from "@lezer/python";
-import { parser as jsParser } from "@lezer/javascript";
 import { RustCallGraphTraversalClient } from "./rust-lezer-tree-traverse-to-cfg";
 
 // This method is called when your extension is activated
@@ -59,7 +57,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
       );
 
-      panel.webview.html = getWebviewContent("gcd", dots);
+      panel.webview.html = getWebviewContent("run_demo", dots);
     }
   );
 

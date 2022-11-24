@@ -1,5 +1,3 @@
-import { RustSyntaxNodeDecor } from "./node";
-import { NodeWithName } from "./state";
 import { digraphEnd, digraphStart, funcDotStart, varDotStart } from "./utils";
 
 export class GraphManager {

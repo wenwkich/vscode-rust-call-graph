@@ -21,7 +21,7 @@ export class RustSyntaxNodeVisitor {
   source: string | Buffer;
 
   /** internal state */
-  stateManager = new InternalStateManager<RustSyntaxNodeDecor>();
+  stateManager = new InternalStateManager();
 
   /** graph state */
   graphManager = new GraphManager();
@@ -51,7 +51,7 @@ export class RustSyntaxNodeVisitor {
     const funcName = this.getName(node);
 
     // initialize block and existingVar
-    const realFuncName = this.stateManager.initializeFunction(funcName, node);
+    const realFuncName = this.stateManager.initializeFunction(funcName);
     this.graphManager.initializeFunction(realFuncName);
 
     const blockNode = node.getChild("Block");
@@ -84,7 +84,7 @@ export class RustSyntaxNodeVisitor {
 
       // connect the last item with variables
       if (lastItem) {
-        this.graphManager.addEdge(funcName, lastItem.name, varName);
+        this.graphManager.addEdge(funcName, lastItem, varName);
       }
       if (
         node.parent?.name === "IfExpression" ||
@@ -92,7 +92,7 @@ export class RustSyntaxNodeVisitor {
         node.parent?.name === "WhileExpression" ||
         node.parent?.name === "ForExpression"
       ) {
-        this.stateManager.pushToCurrentStack(varName, undefined);
+        this.stateManager.pushToCurrentStack(varName);
       }
     });
   }
@@ -119,7 +119,7 @@ export class RustSyntaxNodeVisitor {
     const lastElems = this.stateManager.popAllFromCurrentStack();
 
     lastElems.map((elem) => {
-      this.graphManager.addEdge(funcName, elem!.name, condName);
+      this.graphManager.addEdge(funcName, elem, condName);
     });
 
     const blocks = node.getChildren("Block");
@@ -129,10 +129,7 @@ export class RustSyntaxNodeVisitor {
 
       this.graphManager.addEdge(funcName, condName, blockName, name);
 
-      const realFuncName = this.stateManager.initializeFunction(
-        blockName,
-        node
-      );
+      const realFuncName = this.stateManager.initializeFunction(blockName);
       this.graphManager.initializeFunction(realFuncName);
 
       this.visitStatementChildren(block);
@@ -162,17 +159,13 @@ export class RustSyntaxNodeVisitor {
     const funcIden = node.getChild("Identifier");
     const argList = node.getChild("ArgList");
 
+    // TODO: check repeat
+
     if (!node.type.is("Statement")) {
-      this.stateManager.pushToCurrentStack(
-        this.sliceSource(funcIden!),
-        funcIden!
-      );
+      this.stateManager.pushToCurrentStack(this.sliceSource(funcIden!));
     }
     this.mapExpressionChildren(argList!, (child) => {
-      this.stateManager.pushToCurrentStack(
-        this.sliceSource(funcIden!),
-        funcIden!
-      );
+      this.stateManager.pushToCurrentStack(this.sliceSource(funcIden!));
       child.accept(this);
     });
   }
@@ -204,11 +197,11 @@ export class RustSyntaxNodeVisitor {
     );
 
     if (!node.type.is("Statement")) {
-      this.stateManager.pushToCurrentStack(opName, op!);
+      this.stateManager.pushToCurrentStack(opName);
     }
 
     this.mapExpressionChildren(node, (child) => {
-      this.stateManager.pushToCurrentStack(opName, op!);
+      this.stateManager.pushToCurrentStack(opName);
       child.accept(this);
     });
   }
@@ -229,14 +222,14 @@ export class RustSyntaxNodeVisitor {
         this.graphManager.addVarNode(contextFuncName, name, name);
       }
     }
-    this.stateManager.pushToCurrentStack(this.sliceSource(node), node);
+    this.stateManager.pushToCurrentStack(this.sliceSource(node));
   }
 
   visitLiteralExpressionNode(node: LiteralExpressionNode) {
     const contextFuncName = this.stateManager.peekCurrentFunctionName();
     const name = this.sliceSource(node);
     this.graphManager.addVarNode(contextFuncName, name, name);
-    this.stateManager.pushToCurrentStack(this.sliceSource(node), node);
+    this.stateManager.pushToCurrentStack(this.sliceSource(node));
     // no more children to visit
   }
 
@@ -247,32 +240,20 @@ export class RustSyntaxNodeVisitor {
   /** PRIVATE FUNCTIONS */
   private visitChildren(
     type: "Statement" | "Expression",
-    node: RustSyntaxNodeDecor,
-    before?: (node: RustSyntaxNodeDecor) => void,
-    after?: (node: RustSyntaxNodeDecor) => void
+    node: RustSyntaxNodeDecor
   ) {
     const nodes = node.getChildren(type);
     nodes.map((node) => {
-      before && before(node);
       node.accept(this);
-      after && after(node);
     });
   }
 
-  private visitStatementChildren(
-    node: RustSyntaxNodeDecor,
-    before?: (node: RustSyntaxNodeDecor) => void,
-    after?: (node: RustSyntaxNodeDecor) => void
-  ) {
-    this.visitChildren("Statement", node, before, after);
+  private visitStatementChildren(node: RustSyntaxNodeDecor) {
+    this.visitChildren("Statement", node);
   }
 
-  private visitExpressionChildren(
-    node: RustSyntaxNodeDecor,
-    before?: (node: RustSyntaxNodeDecor) => void,
-    after?: (node: RustSyntaxNodeDecor) => void
-  ) {
-    this.visitChildren("Expression", node, before, after);
+  private visitExpressionChildren(node: RustSyntaxNodeDecor) {
+    this.visitChildren("Expression", node);
   }
 
   private mapChildren(
@@ -388,7 +369,7 @@ export class RustSyntaxNodeVisitor {
     while (this.stateManager.getCurrentStackLength() > n) {
       const left = this.stateManager.popFromCurrentStack();
       const right = this.stateManager.popFromCurrentStack();
-      left && right && this.graphManager.pushEdge(left.name, right.name);
+      left && right && this.graphManager.pushEdge(left, right);
     }
     // this is to make sure the order is reversed
     this.graphManager.popAndAddEdges(
@@ -397,16 +378,14 @@ export class RustSyntaxNodeVisitor {
   }
 
   private popAndDrawGraph() {
-    const stackLen = this.stateManager.getCurrentStackLength();
-
     const left = this.stateManager.popFromCurrentStack();
     const right = this.stateManager.popFromCurrentStack();
     left &&
       right &&
       this.graphManager.addEdge(
         this.stateManager.peekCurrentFunctionName(),
-        left.name,
-        right.name
+        left,
+        right
       );
   }
 }

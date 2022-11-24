@@ -1,19 +1,14 @@
 import { FunctionItemNode, RustSyntaxNodeDecor } from "./node";
 
-export type NodeWithName<T> = {
-  node: T | undefined;
-  name: string;
-};
-
-export class InternalStateManager<T> {
+export class InternalStateManager {
   // stack the function so nodes know about where it belongs
-  funcStack: NodeWithName<T>[] = [];
+  funcStack: string[] = [];
   // mapping of a function scope to stacked variable
-  stacks: Record<string, NodeWithName<T>[]> = {};
+  stacks: Record<string, string[]> = {};
   // internal counter for variable or expression
   counters: Record<string, Record<string, number>> = {};
 
-  initializeFunction(funcName: string, node: T) {
+  initializeFunction(funcName: string) {
     // collision
     if (funcName in this.funcStack) {
       funcName = funcName + "_copy";
@@ -22,10 +17,7 @@ export class InternalStateManager<T> {
     this.stacks[funcName] = [];
     this.counters[funcName] = {};
 
-    this.funcStack.push({
-      name: funcName,
-      node,
-    });
+    this.funcStack.push(funcName);
 
     return funcName;
   }
@@ -35,24 +27,15 @@ export class InternalStateManager<T> {
   }
 
   peekCurrentFunctionName() {
-    return this.funcStack[this.funcStack.length - 1].name;
+    return this.funcStack[this.funcStack.length - 1];
   }
 
-  pushToStack(funcName: string, name: string, node: T) {
-    this.stacks[funcName].push({
-      name,
-      node,
-    });
+  pushToStack(funcName: string, name: string) {
+    this.stacks[funcName].push(name);
   }
 
-  pushToCurrentStack(name: string, node: T | undefined) {
-    this.stacks[this.peekCurrentFunctionName()].push({
-      name,
-      node,
-    });
-    // console.log(
-    //   this.stacks[this.peekCurrentFunctionName()].map(({ name }) => name)
-    // );
+  pushToCurrentStack(name: string) {
+    this.pushToStack(this.peekCurrentFunctionName(), name);
   }
 
   popFromStack(funcName: string) {
