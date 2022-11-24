@@ -1,7 +1,7 @@
 import { FunctionItemNode, RustSyntaxNodeDecor } from "./node";
 
 export type NodeWithName<T> = {
-  node: T;
+  node: T | undefined;
   name: string;
 };
 
@@ -45,7 +45,7 @@ export class InternalStateManager<T> {
     });
   }
 
-  pushToCurrentStack(name: string, node: T) {
+  pushToCurrentStack(name: string, node: T | undefined) {
     this.stacks[this.peekCurrentFunctionName()].push({
       name,
       node,

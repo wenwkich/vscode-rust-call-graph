@@ -65,7 +65,7 @@ export class RustSyntaxNodeVisitor {
 
   visitLetDeclarationNode(node: LetDeclarationNode) {
     // todo
-    let varNames = this.getBoundIdentifiers(node);
+    let varNames = this.recursiveGetBoundIden(node);
 
     this.visitExpressionChildren(node);
 
@@ -86,21 +86,19 @@ export class RustSyntaxNodeVisitor {
       if (lastItem) {
         this.graphManager.addEdge(funcName, lastItem.name, varName);
       }
-    });
-
-    if (lastItem) {
       if (
         node.parent?.name === "IfExpression" ||
         node.parent?.name === "MatchExpression" ||
         node.parent?.name === "WhileExpression" ||
         node.parent?.name === "ForExpression"
       ) {
-        this.stateManager.pushToCurrentStack(lastItem.name, lastItem.node);
+        this.stateManager.pushToCurrentStack(varName, undefined);
       }
-    }
+    });
   }
 
   /** EXPRESSIONS */
+  // TODO: fix expression situation
   visitIfExpressionNode(node: IfExpressionNode) {
     // traverse the condition first
     const letStatement = node.getChild("LetDeclaration");
@@ -164,12 +162,7 @@ export class RustSyntaxNodeVisitor {
     const funcIden = node.getChild("Identifier");
     const argList = node.getChild("ArgList");
 
-    console.log(this.sliceSource(node));
-    console.log(this.sliceSource(funcIden!));
-    console.log(node.parent?.name);
-
     if (!node.type.is("Statement")) {
-      console.log("is statement");
       this.stateManager.pushToCurrentStack(
         this.sliceSource(funcIden!),
         funcIden!
@@ -219,6 +212,8 @@ export class RustSyntaxNodeVisitor {
       child.accept(this);
     });
   }
+
+  // TODO: handle return
 
   visitIdentifierNode(node: IdentifierNode) {
     // see if this is variable or a function
@@ -317,13 +312,13 @@ export class RustSyntaxNodeVisitor {
 
   private recursiveGetBoundIden(node: RustSyntaxNodeDecor): string[] {
     const boundIdens = node.getChildren("BoundIdentifier");
-    const thisLevelRes = boundIdens.map((boundElem) =>
-      this.source.slice(boundElem?.from, boundElem?.to).toString()
-    );
-    const exprs = node.getChildren("Expression");
-    return thisLevelRes.concat(
-      exprs.map((expr) => this.recursiveGetBoundIden(expr)).flat(1)
-    );
+    if (boundIdens.length !== 0) {
+      return boundIdens.map((boundElem) =>
+        this.source.slice(boundElem?.from, boundElem?.to).toString()
+      );
+    }
+    const children = node?.getChildren("Pattern");
+    return children.map((expr) => this.recursiveGetBoundIden(expr)).flat();
   }
 
   private getIdentifiers(node: RustSyntaxNodeDecor) {

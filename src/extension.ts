@@ -59,7 +59,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
       );
 
-      panel.webview.html = getWebviewContent("run_demo", dots);
+      panel.webview.html = getWebviewContent("gcd", dots);
     }
   );
 
