@@ -12,6 +12,8 @@ export class GraphManager {
     return `
 ${digraphStart}
 
+  label="${funcName}"
+
   ${varDotStart}
   ${this.varNodes[funcName]?.join("\n") || ""}
 
