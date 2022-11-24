@@ -12,12 +12,15 @@ export class GraphManager {
   getFuncResult(funcName: string) {
     return `
 ${digraphStart}
-  ${funcDotStart}\n
-  ${this.funcNodes[funcName]?.join("\n") || ""}
-  ${varDotStart}\n
+
+  ${varDotStart}
   ${this.varNodes[funcName]?.join("\n") || ""}
+
+  ${funcDotStart}
+  ${this.funcNodes[funcName]?.join("\n") || ""}
   
   ${this.edges[funcName]?.join("\n") || ""}
+
 ${digraphEnd}
     `.trim();
   }
@@ -35,14 +38,22 @@ ${digraphEnd}
     this.edges[funcName] = [];
   }
 
-  // TODO:
-  addFuncNode(funcName: string, node: NodeWithName<RustSyntaxNodeDecor>) {
-    this.funcNodes[funcName].push();
+  addFuncNode(contextFuncName: string, funcId: string, label: string) {
+    this.funcNodes[contextFuncName].push(
+      `${funcId} [ id="${funcId}" label="${label}" class="clicky" ]`
+    );
   }
 
-  // TODO:
-  addVarNode(funcName: string, node: NodeWithName<RustSyntaxNodeDecor>) {
-    this.funcNodes[funcName].push();
+  addNonClickyFuncNode(contextFuncName: string, funcId: string, label: string) {
+    this.funcNodes[contextFuncName].push(
+      `${funcId} [ id="${funcId}" label="${label}" ]`
+    );
+  }
+
+  addVarNode(contextFuncName: string, varId: string, label: string) {
+    this.varNodes[contextFuncName].push(
+      `${varId} [ id="${varId}" label="${label}" ]`
+    );
   }
 
   addEdge(funcName: string, left: string, right: string, extraLabel?: string) {

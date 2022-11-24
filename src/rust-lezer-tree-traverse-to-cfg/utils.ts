@@ -3,11 +3,11 @@ export const digraphStart = `
 `;
 
 export const funcDotStart = `
-    node [ shape="plaintext" class="clicky" style="filled,rounded" color="#D5EDFF" ]
+    node [ shape="plaintext" style="filled,rounded" color="#D5EDFF" ]
 `;
 
 export const varDotStart = `
-    node [ color="#FCECCB" ]
+    node [ color="#FCECCB" style="filled" ]
 `;
 
 export const digraphEnd = `

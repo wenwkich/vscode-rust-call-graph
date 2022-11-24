@@ -32,6 +32,9 @@ export abstract class RustSyntaxNodeDecor implements RustSyntaxNodeDecor {
       case "BinaryExpression": {
         return new BinaryExpressionNode(node);
       }
+      case "CallExpression": {
+        return new CallExpressionNode(node);
+      }
       case "String":
       case "RawString":
       case "Char":

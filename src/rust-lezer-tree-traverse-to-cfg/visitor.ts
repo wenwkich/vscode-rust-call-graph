@@ -26,13 +26,8 @@ export class RustSyntaxNodeVisitor {
   /** graph state */
   graphManager = new GraphManager();
 
-  // whether print internal var or not
-  debug: boolean;
-
-  // TODO: set default debug to false;
-  constructor(source: string | Buffer, debug = true) {
+  constructor(source: string | Buffer) {
     this.source = source;
-    this.debug = debug;
   }
 
   /** DEFAULT NODES FALLBACK */
@@ -53,7 +48,7 @@ export class RustSyntaxNodeVisitor {
   }
 
   visitFunctionItemNode(node: FunctionItemNode) {
-    const funcName = this.getNameFromNode(node);
+    const funcName = this.getName(node);
 
     // initialize block and existingVar
     const realFuncName = this.stateManager.initializeFunction(funcName, node);
@@ -70,7 +65,7 @@ export class RustSyntaxNodeVisitor {
 
   visitLetDeclarationNode(node: LetDeclarationNode) {
     // todo
-    let varNames = this.getBoundIdentifiersFromNode(node);
+    let varNames = this.getBoundIdentifiers(node);
 
     this.visitExpressionChildren(node);
 
@@ -85,45 +80,56 @@ export class RustSyntaxNodeVisitor {
         varName += `_${counter}`;
       }
 
-      // TODO: add node to graph
+      this.graphManager.addVarNode(funcName, varName, varName);
 
       // connect the last item with variables
       if (lastItem) {
         this.graphManager.addEdge(funcName, lastItem.name, varName);
       }
     });
+
+    if (lastItem) {
+      if (
+        node.parent?.name === "IfExpression" ||
+        node.parent?.name === "MatchExpression" ||
+        node.parent?.name === "WhileExpression" ||
+        node.parent?.name === "ForExpression"
+      ) {
+        this.stateManager.pushToCurrentStack(lastItem.name, lastItem.node);
+      }
+    }
   }
 
   /** EXPRESSIONS */
   visitIfExpressionNode(node: IfExpressionNode) {
-    // TODO: add nodes
-    this.stateManager.pushToCurrentStack("if", node);
-
     // traverse the condition first
-    const expression = node.getChild("Expression");
     const letStatement = node.getChild("LetDeclaration");
+    const expression = node.getChild("Expression");
 
     const funcName = this.stateManager.peekCurrentFunctionName();
 
-    const cond = expression || letStatement;
+    const cond = letStatement || expression;
     const condName = cond !== null ? this.sliceSourceReplaced(cond) : "";
-    // TODO: add mode for full statement
+    cond &&
+      this.graphManager.addVarNode(
+        funcName,
+        condName,
+        "if " + this.sliceSource(cond)
+      );
+
     cond?.accept(this);
     const lastElems = this.stateManager.popAllFromCurrentStack();
-    // TODO: remember to add nodes
+
     lastElems.map((elem) => {
       this.graphManager.addEdge(funcName, elem!.name, condName);
     });
 
     const blocks = node.getChildren("Block");
-    // if block
-    if (blocks.length >= 1) {
-      const ifBlock = blocks[0];
+    const handleBlock = (block: RustSyntaxNodeDecor, name: string) => {
+      const blockName = condName + `_${name}`;
+      this.graphManager.addFuncNode(funcName, blockName, `${name} block`);
 
-      const blockName = condName + "_then";
-      // TODO: remember to add nodes
-
-      this.graphManager.addEdge(funcName, condName, blockName, "then");
+      this.graphManager.addEdge(funcName, condName, blockName, name);
 
       const realFuncName = this.stateManager.initializeFunction(
         blockName,
@@ -131,29 +137,19 @@ export class RustSyntaxNodeVisitor {
       );
       this.graphManager.initializeFunction(realFuncName);
 
-      this.visitStatementChildren(ifBlock);
+      this.visitStatementChildren(block);
 
       this.stateManager.popFunction();
+    };
+
+    // if block
+    if (blocks.length >= 1) {
+      handleBlock(blocks[0], "then");
     }
 
     // there is a else block
     if (blocks.length === 2) {
-      const elseBlock = blocks[1];
-
-      const blockName = condName + "_else";
-      // TODO: remember to add nodes
-
-      this.graphManager.addEdge(funcName, condName, blockName, "else");
-
-      const realFuncName = this.stateManager.initializeFunction(
-        blockName,
-        node
-      );
-      this.graphManager.initializeFunction(realFuncName);
-
-      this.visitStatementChildren(elseBlock);
-
-      this.stateManager.popFunction();
+      handleBlock(blocks[1], "else");
     }
 
     this.visitExpressionChildren(node);
@@ -165,13 +161,29 @@ export class RustSyntaxNodeVisitor {
   // TODO: ForExpression
 
   visitCallExpressionNode(node: CallExpressionNode) {
-    const funcInden = this.getIdentifiersFromNode(node);
-    // TODO: draw function node if not declared
-    this.stateManager.pushToCurrentStack(this.sliceSource(node), node);
-    this.visitExpressionChildren(node);
+    const funcIden = node.getChild("Identifier");
+    const argList = node.getChild("ArgList");
+
+    console.log(this.sliceSource(node));
+    console.log(this.sliceSource(funcIden!));
+    console.log(node.parent?.name);
+
+    if (!node.type.is("Statement")) {
+      console.log("is statement");
+      this.stateManager.pushToCurrentStack(
+        this.sliceSource(funcIden!),
+        funcIden!
+      );
+    }
+    this.mapExpressionChildren(argList!, (child) => {
+      this.stateManager.pushToCurrentStack(
+        this.sliceSource(funcIden!),
+        funcIden!
+      );
+      child.accept(this);
+    });
   }
 
-  // TODO: visit assignment expression
   visitAssignmentExpressionNode(node: AssignmentExpressionNode) {
     // TODO:
   }
@@ -191,7 +203,13 @@ export class RustSyntaxNodeVisitor {
       opName += `_${opCount}`;
     }
 
-    // TODO: check if the order is correct
+    const funcName = this.stateManager.peekCurrentFunctionName();
+    this.graphManager.addNonClickyFuncNode(
+      funcName,
+      opName,
+      this.sliceSource(op!)
+    );
+
     if (!node.type.is("Statement")) {
       this.stateManager.pushToCurrentStack(opName, op!);
     }
@@ -203,11 +221,26 @@ export class RustSyntaxNodeVisitor {
   }
 
   visitIdentifierNode(node: IdentifierNode) {
-    // TODO: see if this is variable or a function
+    // see if this is variable or a function
+    const name = this.sliceSource(node);
+    const contextFuncName = this.stateManager.peekCurrentFunctionName();
+    if (node.parent?.name === "CallExpression") {
+      // need to check number
+      const counter = this.stateManager.incrementCounter(name);
+      const realName = counter === 0 ? name : `${name}_${counter}`;
+      this.graphManager.addFuncNode(contextFuncName, realName, realName);
+    } else {
+      if (this.stateManager.getCounter(name) === 0) {
+        this.graphManager.addVarNode(contextFuncName, name, name);
+      }
+    }
     this.stateManager.pushToCurrentStack(this.sliceSource(node), node);
   }
 
   visitLiteralExpressionNode(node: LiteralExpressionNode) {
+    const contextFuncName = this.stateManager.peekCurrentFunctionName();
+    const name = this.sliceSource(node);
+    this.graphManager.addVarNode(contextFuncName, name, name);
     this.stateManager.pushToCurrentStack(this.sliceSource(node), node);
     // no more children to visit
   }
@@ -270,72 +303,81 @@ export class RustSyntaxNodeVisitor {
     this.mapChildren("Expression", node, mapFunc);
   }
 
-  private getNameFromNode(node: FunctionItemNode | LetDeclarationNode) {
+  private getName(node: FunctionItemNode | LetDeclarationNode) {
     const boundElem = node.getChild("BoundIdentifier");
     return this.source.slice(boundElem?.from, boundElem?.to).toString();
   }
 
-  private getBoundIdentifiersFromNode(node: RustSyntaxNodeDecor) {
+  private getBoundIdentifiers(node: RustSyntaxNodeDecor) {
     const boundElems = node.getChildren("BoundIdentifier");
     return boundElems.map((boundElem) =>
       this.source.slice(boundElem?.from, boundElem?.to).toString()
     );
   }
 
-  private getIdentifiersFromNode(node: RustSyntaxNodeDecor) {
+  private recursiveGetBoundIden(node: RustSyntaxNodeDecor): string[] {
+    const boundIdens = node.getChildren("BoundIdentifier");
+    const thisLevelRes = boundIdens.map((boundElem) =>
+      this.source.slice(boundElem?.from, boundElem?.to).toString()
+    );
+    const exprs = node.getChildren("Expression");
+    return thisLevelRes.concat(
+      exprs.map((expr) => this.recursiveGetBoundIden(expr)).flat(1)
+    );
+  }
+
+  private getIdentifiers(node: RustSyntaxNodeDecor) {
     const idenElems = node.getChildren("Identifier");
     return idenElems.map((idenElem) =>
       this.source.slice(idenElem?.from, idenElem?.to).toString()
     );
   }
 
-  private log(msg: string | Buffer) {
-    if (this.debug) {
-      console.log(msg.toString());
-    }
-  }
-
   private sliceSourceReplaced(node: RustSyntaxNodeDecor) {
-    return this.sliceSource(node).replace(
-      /<<|>>|&&|\|\||>=|<=|==|[\-_]|\s/g,
-      (m) =>
-        ({
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          "+": "_add_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          "-": "_sub_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          "*": "_mul_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          "/": "_div_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          "%": "_mod_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          "<<": "_left_shift_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          ">>": "_right_shift_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          "&&": "_and_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          "||": "_or_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          "|": "_bit_or_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          "&": "_bit_or_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          "^": "_bit_xor_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          ">=": "_geq_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          "<=": "_leq_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          "==": "_eq_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          "<": "_lt_",
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          ">": "_gt_",
-        }[m] || "_")
-    );
+    return this.sliceSource(node)
+      .replace(
+        /<<|>>|&&|\|\||>=|<=|==|[\W]|\s/g,
+        (m) =>
+          ({
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "+": "_add_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "-": "_sub_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "*": "_mul_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "/": "_div_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "%": "_mod_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "<<": "_left_shift_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            ">>": "_right_shift_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "&&": "_and_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "||": "_or_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "|": "_bit_or_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "&": "_bit_or_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "^": "_bit_xor_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            ">=": "_geq_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "<=": "_leq_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "==": "_eq_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "=": "_eq_to_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            "<": "_lt_",
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            ">": "_gt_",
+          }[m] || "_")
+      )
+      .replace(/_+/g, "_");
   }
 
   private sliceSource(node: RustSyntaxNodeDecor) {
@@ -344,7 +386,11 @@ export class RustSyntaxNodeVisitor {
 
   /** draw graph from stack */
   private popAllAndDrawGraph() {
-    while (this.stateManager.getCurrentStackLength() > 1) {
+    this.popAllUntilNAndDrawGraph(1);
+  }
+
+  private popAllUntilNAndDrawGraph(n: number) {
+    while (this.stateManager.getCurrentStackLength() > n) {
       const left = this.stateManager.popFromCurrentStack();
       const right = this.stateManager.popFromCurrentStack();
       left && right && this.graphManager.pushEdge(left.name, right.name);

@@ -50,6 +50,9 @@ export class InternalStateManager<T> {
       name,
       node,
     });
+    // console.log(
+    //   this.stacks[this.peekCurrentFunctionName()].map(({ name }) => name)
+    // );
   }
 
   popFromStack(funcName: string) {
@@ -64,7 +67,7 @@ export class InternalStateManager<T> {
     let result = [];
 
     while (this.getCurrentStackLength() !== 0) {
-      result.push(this.stacks[this.peekCurrentFunctionName()].pop());
+      result.push(this.stacks[this.peekCurrentFunctionName()].pop()!);
     }
 
     return result;
