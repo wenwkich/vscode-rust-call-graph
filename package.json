@@ -1,13 +1,15 @@
 {
   "name": "vscode-rust-call-graph",
-  "displayName": "vscode-rust-call-graph",
+  "displayName": "Rust Call Graph",
   "description": "",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.73.0"
   },
   "categories": [
-    "Other"
+    "Language Packs",
+    "Education",
+    "Programming Languages"
   ],
   "activationEvents": [
     "onCommand:vscode-rust-call-graph.showCallGraph"
