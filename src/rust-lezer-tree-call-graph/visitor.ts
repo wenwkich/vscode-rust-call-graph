@@ -98,7 +98,6 @@ export class RustSyntaxNodeVisitor {
   }
 
   /** EXPRESSIONS */
-  // TODO: fix expression situation
   visitIfExpressionNode(node: IfExpressionNode) {
     // traverse the condition first
     const letStatement = node.getChild("LetDeclaration");
@@ -135,6 +134,8 @@ export class RustSyntaxNodeVisitor {
     const blocks = node.getChildren("Block");
     const handleBlock = (block: RustSyntaxNodeDecor, name: string) => {
       const blockName = condName + `_${name}`;
+
+      // TODO: if there is only one return statement in the block, don't hide it
       this.graphManager.addFuncNode(funcName, blockName, `${name} block`);
 
       this.graphManager.addEdge(funcName, condName, blockName, name);
@@ -211,7 +212,7 @@ export class RustSyntaxNodeVisitor {
       this.sliceSource(op!)
     );
 
-    if (node.parent?.type.is("Expression")) {
+    if (!node.parent?.type.is("Block")) {
       this.stateManager.pushToCurrentStack(opName);
     }
 
@@ -314,6 +315,7 @@ export class RustSyntaxNodeVisitor {
   }
 
   private getIdentifiers(node: RustSyntaxNodeDecor) {
+    // TODO: ignore some of the macros like assert and print
     const idenElems = node.getChildren("Identifier");
     return idenElems.map((idenElem) =>
       this.source.slice(idenElem?.from, idenElem?.to).toString()
