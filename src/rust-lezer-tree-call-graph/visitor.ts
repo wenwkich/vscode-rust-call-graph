@@ -33,6 +33,9 @@ export class RustSyntaxNodeVisitor {
 
   /** DEFAULT NODES FALLBACK */
   visitDefaultStatementNode(node: DefaultStatementNode) {
+    if (node.name === "MacroInvocation") {
+      return;
+    }
     this.visitExpressionChildren(node);
   }
 
@@ -326,7 +329,6 @@ export class RustSyntaxNodeVisitor {
   }
 
   private getIdentifiers(node: RustSyntaxNodeDecor) {
-    // TODO: ignore some of the macros like assert and print
     const idenElems = node.getChildren("Identifier");
     return idenElems.map((idenElem) =>
       this.source.slice(idenElem?.from, idenElem?.to).toString()
