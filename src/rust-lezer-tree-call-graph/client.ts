@@ -1,15 +1,14 @@
 import { Tree } from "@lezer/common";
 import { RustSyntaxNodeDecor } from "./node";
 import { RustSyntaxNodeVisitor } from "./visitor";
+import { parser } from "@lezer/rust";
 
 export class RustCallGraphTraversalClient {
   visitor: RustSyntaxNodeVisitor;
   tree: Tree;
-  constructor(
-    tree: Tree,
-    source?: string | Buffer,
-    visitor?: RustSyntaxNodeVisitor
-  ) {
+  constructor(source: string, visitor?: RustSyntaxNodeVisitor) {
+    const tree = parser.parse(source);
+
     if (visitor === undefined) {
       if (source === undefined) {
         throw new Error("Source is not provided");

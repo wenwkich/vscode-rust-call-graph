@@ -2,7 +2,6 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import { getWebviewContent } from "./view";
-import { parser as rustParser } from "@lezer/rust";
 import { RustCallGraphTraversalClient } from "./rust-lezer-tree-call-graph";
 
 // This method is called when your extension is activated
@@ -26,8 +25,7 @@ export function activate(context: vscode.ExtensionContext) {
       let dots: Record<string, string>;
       switch (languageId) {
         case "rust": {
-          const tree = rustParser.parse(source);
-          dots = new RustCallGraphTraversalClient(tree, source).traverse();
+          dots = new RustCallGraphTraversalClient(source).traverse();
           break;
         }
         default: {
@@ -49,6 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
       );
 
+      // TODO: let user input the entry function
       panel.webview.html = getWebviewContent("run_demo", dots);
     }
   );
