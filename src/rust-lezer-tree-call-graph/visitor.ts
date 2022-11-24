@@ -108,6 +108,7 @@ export class RustSyntaxNodeVisitor {
 
     const cond = letStatement || expression;
     const condName = cond !== null ? this.sliceSourceReplaced(cond) : "";
+
     cond &&
       this.graphManager.addVarNode(
         funcName,
@@ -116,11 +117,20 @@ export class RustSyntaxNodeVisitor {
       );
 
     cond?.accept(this);
-    const lastElems = this.stateManager.popAllFromCurrentStack();
 
-    lastElems.map((elem) => {
-      this.graphManager.addEdge(funcName, elem, condName);
-    });
+    if (letStatement !== null) {
+      const lastElems = this.stateManager.popAllFromCurrentStack();
+
+      lastElems.map((elem) => {
+        this.graphManager.addEdge(funcName, elem, condName);
+      });
+    } else {
+      this.popAllAndDrawGraph();
+      const lastItem = this.stateManager.popFromCurrentStack();
+      if (lastItem) {
+        this.graphManager.addEdge(funcName, lastItem, condName);
+      }
+    }
 
     const blocks = node.getChildren("Block");
     const handleBlock = (block: RustSyntaxNodeDecor, name: string) => {
@@ -201,7 +211,7 @@ export class RustSyntaxNodeVisitor {
       this.sliceSource(op!)
     );
 
-    if (!node.type.is("Statement")) {
+    if (node.parent?.type.is("Expression")) {
       this.stateManager.pushToCurrentStack(opName);
     }
 
