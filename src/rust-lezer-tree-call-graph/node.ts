@@ -35,6 +35,9 @@ export abstract class RustSyntaxNodeDecor implements RustSyntaxNodeDecor {
       case "CallExpression": {
         return new CallExpressionNode(node);
       }
+      case "ReturnExpression": {
+        return new ReturnExpressionNode(node);
+      }
       case "String":
       case "RawString":
       case "Char":
@@ -174,5 +177,11 @@ export class LiteralExpressionNode extends RustSyntaxNodeDecor {
 export class IdentifierNode extends RustSyntaxNodeDecor {
   accept(v: RustSyntaxNodeVisitor) {
     v.visitIdentifierNode(this);
+  }
+}
+
+export class ReturnExpressionNode extends RustSyntaxNodeDecor {
+  accept(v: RustSyntaxNodeVisitor) {
+    v.visitReturnExpressionNode(this);
   }
 }

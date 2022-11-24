@@ -12,6 +12,7 @@ import {
   IfExpressionNode,
   LetDeclarationNode,
   LiteralExpressionNode,
+  ReturnExpressionNode,
   RustSyntaxNodeDecor,
 } from "./node";
 import { InternalStateManager } from "./state";
@@ -71,7 +72,7 @@ export class RustSyntaxNodeVisitor {
 
     this.popAllAndDrawGraph();
     const lastItem = this.stateManager.popFromCurrentStack();
-    const funcName = this.stateManager.peekCurrentFunctionName();
+    const funcName = this.currentFunc;
 
     varNames.map((varName) => {
       const counter = this.stateManager.incrementCounter(varName);
@@ -103,7 +104,7 @@ export class RustSyntaxNodeVisitor {
     const letStatement = node.getChild("LetDeclaration");
     const expression = node.getChild("Expression");
 
-    const funcName = this.stateManager.peekCurrentFunctionName();
+    const funcName = this.currentFunc;
 
     const cond = letStatement || expression;
     const condName = cond !== null ? this.sliceSourceReplaced(cond) : "";
@@ -169,7 +170,7 @@ export class RustSyntaxNodeVisitor {
     const argList = node.getChild("ArgList");
 
     // need to check number
-    const contextFuncName = this.stateManager.peekCurrentFunctionName();
+    const contextFuncName = this.currentFunc;
     const name = this.sliceSource(funcIden!);
     const counter = this.stateManager.incrementCounter(name);
     const funcId = counter === 0 ? name : `${name}_${counter}`;
@@ -203,7 +204,7 @@ export class RustSyntaxNodeVisitor {
       opName += `_${opCount}`;
     }
 
-    const funcName = this.stateManager.peekCurrentFunctionName();
+    const funcName = this.currentFunc;
     this.graphManager.addNonClickyFuncNode(
       funcName,
       opName,
@@ -222,12 +223,20 @@ export class RustSyntaxNodeVisitor {
 
   // TODO: handle access function
 
-  // TODO: handle return
+  visitReturnExpressionNode(node: ReturnExpressionNode) {
+    const contextFuncName = this.currentFunc;
+    this.graphManager.addVarNode(contextFuncName, "return", "return");
+    this.visitExpressionChildren(node);
+    const lastElems = this.stateManager.popAllFromCurrentStack();
+    lastElems.map((el) => {
+      this.graphManager.addEdge(contextFuncName, el, "return");
+    });
+  }
 
   visitIdentifierNode(node: IdentifierNode) {
     // see if this is variable or a function
     const name = this.sliceSource(node);
-    const contextFuncName = this.stateManager.peekCurrentFunctionName();
+    const contextFuncName = this.currentFunc;
 
     if (this.stateManager.getCounter(name) === 0) {
       this.graphManager.addVarNode(contextFuncName, name, name);
@@ -236,7 +245,7 @@ export class RustSyntaxNodeVisitor {
   }
 
   visitLiteralExpressionNode(node: LiteralExpressionNode) {
-    const contextFuncName = this.stateManager.peekCurrentFunctionName();
+    const contextFuncName = this.currentFunc;
     const name = this.sliceSource(node);
     this.graphManager.addVarNode(contextFuncName, name, name);
     this.stateManager.pushToCurrentStack(this.sliceSource(node));
@@ -245,6 +254,10 @@ export class RustSyntaxNodeVisitor {
 
   get result() {
     return this.graphManager.result;
+  }
+
+  get currentFunc() {
+    return this.stateManager.peekCurrentFunctionName();
   }
 
   /** PRIVATE FUNCTIONS */
@@ -383,20 +396,12 @@ export class RustSyntaxNodeVisitor {
       left && right && this.graphManager.pushEdge(left, right);
     }
     // this is to make sure the order is reversed
-    this.graphManager.popAndAddEdges(
-      this.stateManager.peekCurrentFunctionName()
-    );
+    this.graphManager.popAndAddEdges(this.currentFunc);
   }
 
   private popAndDrawGraph() {
     const left = this.stateManager.popFromCurrentStack();
     const right = this.stateManager.popFromCurrentStack();
-    left &&
-      right &&
-      this.graphManager.addEdge(
-        this.stateManager.peekCurrentFunctionName(),
-        left,
-        right
-      );
+    left && right && this.graphManager.addEdge(this.currentFunc, left, right);
   }
 }
