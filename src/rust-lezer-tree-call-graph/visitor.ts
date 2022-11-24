@@ -157,8 +157,6 @@ export class RustSyntaxNodeVisitor {
     if (blocks.length === 2) {
       handleBlock(blocks[1], "else");
     }
-
-    this.visitExpressionChildren(node);
   }
 
   // TODO: MatchExpression
